@@ -17,18 +17,22 @@ export const generatePlan = async (userTopic: string): Promise<PlanResponse> => 
   const ai = createClient();
   
   const prompt = `
-    You are an expert content strategist and researcher.
-    The user wants an article about: "${userTopic}".
+    You are an expert project manager and content strategist.
+    The user wants to create a comprehensive piece of content about: "${userTopic}".
     
-    Break this task down into 4 to 6 logical steps to create a high-quality, researched article.
+    Your goal is to break this request down into a detailed, step-by-step workflow.
+    The workflow should mimic a professional content agency process.
     
-    Steps usually involve:
-    1. Research/Analysis (Finding trends, facts)
-    2. Outlining/Persona definition
-    3. Drafting specific sections (Intro, Body, etc.)
-    4. Review/Polishing
+    Required Steps Structure (Create 4-7 detailed steps):
+    1. **Strategic Brief & Persona**: Define who the audience is and the core message.
+    2. **Deep Research**: specific research tasks (e.g., searching for recent data, trends, or platform rules).
+    3. **Structural Outline**: organizing the flow.
+    4. **Content Drafting**: The actual writing phase (can be split into sections if the topic is large).
+    5. **Review & Refinement**: Checking against constraints and polishing.
     
-    Return a clear title and a short description for each task.
+    For each step, provide:
+    - A concise, action-oriented **title** (e.g., "Analyze Audience Persona", "Research 2025 AI Trends").
+    - A detailed **description** of what this agent step will do.
   `;
 
   const schema: Schema = {
@@ -55,7 +59,8 @@ export const generatePlan = async (userTopic: string): Promise<PlanResponse> => 
     config: {
       responseMimeType: "application/json",
       responseSchema: schema,
-      systemInstruction: "You are a helpful planning agent.",
+      systemInstruction: "You are a precise planning algorithm. Break down tasks logically.",
+      thinkingConfig: { thinkingBudget: 2048 }
     },
   });
 
@@ -80,34 +85,40 @@ export const executeStepStream = async (
   // Gather context from previous completed tasks to maintain continuity
   const previousContext = allTasks
     .filter(t => t.status === 'COMPLETED' && t.resultContent)
-    .map(t => `Task: ${t.title}\nResult: ${t.resultContent}`)
+    .map(t => `### Completed Step: ${t.title}\n${t.resultContent}`)
     .join("\n\n---\n\n");
 
   const prompt = `
-    User Topic: "${userTopic}"
-
-    Context from previous steps:
+    You are executing a specific step in a content generation workflow.
+    
+    **Global Goal**: Create content about "${userTopic}".
+    
+    **Context (Previous Steps)**:
     ${previousContext}
 
-    Current Task to Execute:
+    **Current Step to Execute**:
     Title: ${currentTask.title}
     Description: ${currentTask.description}
 
-    Instructions:
-    Perform this task completely. 
-    If it is a research task, provide detailed findings with simulated sources (e.g., [Xinhua], [Reuters]).
-    If it is a writing task, write the actual content in Markdown format.
-    If it is a review task, summarize the key points and checking against constraints.
+    **Instructions**:
+    1. Execute ONLY this specific step. Do not do the whole project.
+    2. If this is a **Research** step, simulate searching and provide bullet points with data/facts.
+    3. If this is a **Brief/Persona** step, define the target audience, tone, and key takeaways.
+    4. If this is a **Writing** step, write the actual content sections requested.
+    5. If this is a **Review** step, critique the previous content and provide a summary of quality checks.
     
-    Output Format:
-    Return ONLY the content for this step in Markdown. Use headers (##), bolding, and lists where appropriate to make it look like a professional report or article section.
+    **Output Style**:
+    - Use professional Markdown.
+    - Use Bold for emphasis.
+    - Use Lists for clarity.
+    - If writing a draft, ensure it is high quality and flows well from the previous context.
   `;
 
   const responseStream = await ai.models.generateContentStream({
     model: "gemini-2.5-flash",
     contents: prompt,
     config: {
-      thinkingConfig: { thinkingBudget: 0 } // Speed preferred for UI feedback, set >0 for complex reasoning if needed
+      thinkingConfig: { thinkingBudget: 0 } // Keep 0 for faster streaming feedback on execution
     }
   });
 

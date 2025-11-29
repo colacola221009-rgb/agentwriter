@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { AgentTask, TaskStatus } from '../types';
-import { Check, Circle, Loader2, ArrowRight } from 'lucide-react';
+import { Check, Loader2, Circle, Clock, ArrowDown } from 'lucide-react';
 
 interface PlanListProps {
   tasks: AgentTask[];
@@ -10,70 +10,95 @@ interface PlanListProps {
 export const PlanList: React.FC<PlanListProps> = ({ tasks, currentTaskId }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to the active task
   useEffect(() => {
     if (currentTaskId && scrollRef.current) {
-        // Simple logic to keep view centered if list is long
+        // Optional: scroll logic
     }
   }, [currentTaskId]);
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 overflow-hidden flex flex-col h-full">
-      <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
-        <h2 className="font-semibold text-gray-800 flex items-center gap-2">
-          <span className="w-2 h-2 bg-black rounded-full"></span>
-          Execution Plan
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col h-full overflow-hidden">
+      <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
+        <h2 className="font-semibold text-gray-800 flex items-center justify-between">
+          <span>Workflow Steps</span>
+          <span className="text-xs font-normal text-gray-500 bg-gray-200/50 px-2 py-1 rounded-full">
+             {tasks.filter(t => t.status === TaskStatus.COMPLETED).length} / {tasks.length} Done
+          </span>
         </h2>
-        <span className="text-xs text-gray-400 font-mono">
-           {tasks.filter(t => t.status === TaskStatus.COMPLETED).length} / {tasks.length}
-        </span>
       </div>
       
-      <div className="flex-1 overflow-y-auto space-y-3 pr-2" ref={scrollRef}>
-        {tasks.map((task) => {
+      <div className="flex-1 overflow-y-auto p-4 space-y-0" ref={scrollRef}>
+        {tasks.map((task, index) => {
           const isPending = task.status === TaskStatus.PENDING;
           const isInProgress = task.status === TaskStatus.IN_PROGRESS;
           const isCompleted = task.status === TaskStatus.COMPLETED;
-          const isActive = task.id === currentTaskId;
+          const isFailed = task.status === TaskStatus.FAILED;
+          const isLast = index === tasks.length - 1;
 
           return (
-            <div 
-              key={task.id}
-              className={`
-                relative p-3 rounded-lg transition-all duration-300 border
-                ${isActive ? 'border-blue-500 bg-blue-50/50 shadow-sm' : 'border-transparent hover:bg-gray-50'}
-                ${isCompleted ? 'opacity-70' : 'opacity-100'}
-              `}
-            >
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 shrink-0">
+            <div key={task.id} className="relative pl-2">
+              {/* Connector Line */}
+              {!isLast && (
+                <div className="absolute left-[19px] top-8 bottom-[-16px] w-0.5 bg-gray-100 z-0"></div>
+              )}
+
+              <div className={`relative flex items-start gap-4 p-3 rounded-lg transition-all duration-300 z-10 ${isInProgress ? 'bg-blue-50/60 ring-1 ring-blue-100' : 'hover:bg-gray-50'}`}>
+                
+                {/* Icon Marker */}
+                <div className="shrink-0 mt-0.5 relative bg-white">
                   {isCompleted && (
-                    <div className="w-5 h-5 rounded-full bg-black flex items-center justify-center text-white">
-                      <Check size={12} strokeWidth={3} />
+                    <div className="w-6 h-6 rounded-full bg-green-500 text-white flex items-center justify-center shadow-sm">
+                      <Check size={14} strokeWidth={3} />
                     </div>
                   )}
                   {isInProgress && (
-                    <div className="w-5 h-5 rounded-full border-2 border-blue-600 flex items-center justify-center animate-spin-slow">
-                      <Loader2 size={12} className="text-blue-600 animate-spin" />
+                    <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-sm ring-4 ring-blue-50">
+                      <Loader2 size={14} className="animate-spin" />
                     </div>
                   )}
                   {isPending && (
-                    <div className="w-5 h-5 rounded-full border-2 border-gray-200"></div>
+                    <div className="w-6 h-6 rounded-full border-2 border-gray-200 bg-white flex items-center justify-center">
+                      <Circle size={8} className="fill-gray-100 text-transparent" />
+                    </div>
+                  )}
+                  {isFailed && (
+                     <div className="w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center">
+                       <span className="font-bold text-xs">!</span>
+                     </div>
                   )}
                 </div>
                 
-                <div className="flex-1">
-                  <h3 className={`text-sm font-medium leading-tight ${isCompleted ? 'text-gray-500 line-through decoration-gray-300' : 'text-gray-800'}`}>
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <h3 className={`text-sm font-medium leading-tight ${isCompleted ? 'text-gray-900' : 'text-gray-700'}`}>
                     {task.title}
                   </h3>
-                  <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                  <p className="text-xs text-gray-500 mt-1 leading-relaxed">
                     {task.description}
                   </p>
+                  
+                  {isInProgress && (
+                     <div className="mt-2 text-xs font-medium text-blue-600 flex items-center gap-1.5 animate-pulse">
+                        Working on it...
+                     </div>
+                  )}
                 </div>
               </div>
+              
+              {/* Spacer for connector line continuity visual */}
+              {!isLast && <div className="h-2"></div>}
             </div>
           );
         })}
+
+        {tasks.length === 0 && (
+          <div className="text-center py-10 px-4 text-gray-400">
+             <div className="w-12 h-12 rounded-full bg-gray-50 border border-gray-100 mx-auto flex items-center justify-center mb-3">
+               <Clock size={20} className="text-gray-300" />
+             </div>
+             <p className="text-sm">Tasks will appear here once you start.</p>
+          </div>
+        )}
       </div>
     </div>
   );

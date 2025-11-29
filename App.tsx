@@ -1,9 +1,9 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { AgentTask, AppState, TaskStatus } from './types';
 import { generatePlan, executeStepStream } from './geminiService';
 import { PlanList } from './components/PlanList';
 import { ContentFeed } from './components/ContentFeed';
-import { Send, StopCircle, RefreshCw, LayoutTemplate } from 'lucide-react';
+import { Send, StopCircle, Bot, Sparkles, Command } from 'lucide-react';
 import { GenerateContentResponse } from '@google/genai';
 
 const App: React.FC = () => {
@@ -13,7 +13,6 @@ const App: React.FC = () => {
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Helper to generate unique IDs
   const generateId = () => Math.random().toString(36).substr(2, 9);
 
   const handleStart = async () => {
@@ -24,7 +23,6 @@ const App: React.FC = () => {
     setCurrentTaskId(null);
 
     try {
-      // 1. Generate Plan
       const plan = await generatePlan(prompt);
       
       const newTasks: AgentTask[] = plan.tasks.map(t => ({
@@ -38,31 +36,26 @@ const App: React.FC = () => {
       setTasks(newTasks);
       setAppState(AppState.EXECUTING);
       
-      // 2. Start Execution Loop
       await executeTasks(newTasks);
       
     } catch (err) {
       console.error(err);
-      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      setError(err instanceof Error ? err.message : 'An unknown error occurred. Please try again.');
       setAppState(AppState.IDLE);
     }
   };
 
   const executeTasks = async (initialTasks: AgentTask[]) => {
-    // We work with a local copy for the loop, but update state for UI
     let currentTasks = [...initialTasks];
 
     for (let i = 0; i < currentTasks.length; i++) {
       const task = currentTasks[i];
       setCurrentTaskId(task.id);
 
-      // Update task status to IN_PROGRESS
       setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: TaskStatus.IN_PROGRESS } : t));
       
       try {
-        // Stream the execution
         const stream = await executeStepStream(task, currentTasks, prompt);
-        
         let accumulatedText = "";
         
         for await (const chunk of stream) {
@@ -70,22 +63,20 @@ const App: React.FC = () => {
             const textPart = c.text;
             if (textPart) {
                 accumulatedText += textPart;
-                // Update state incrementally for streaming effect
                 setTasks(prev => prev.map(t => t.id === task.id ? { ...t, resultContent: accumulatedText } : t));
             }
         }
 
-        // Mark as COMPLETED
         setTasks(prev => {
             const updated = prev.map(t => t.id === task.id ? { ...t, status: TaskStatus.COMPLETED, resultContent: accumulatedText } : t);
-            currentTasks = updated; // Update local ref for next iteration context
+            currentTasks = updated;
             return updated;
         });
 
       } catch (e) {
         console.error("Task failed", e);
         setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: TaskStatus.FAILED } : t));
-        break; // Stop execution on failure
+        break;
       }
     }
 
@@ -94,99 +85,98 @@ const App: React.FC = () => {
   };
 
   const handleStop = () => {
-    // simple reload to reset for this demo, in prod we would use AbortController
     window.location.reload(); 
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F9FAFB] text-slate-900">
+    <div className="min-h-screen bg-[#F3F4F6] text-gray-900 font-sans selection:bg-blue-100">
       
-      {/* Top Bar */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="bg-black text-white p-1.5 rounded-lg">
-              <LayoutTemplate size={20} />
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-50 h-16">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 h-full flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-lg flex items-center justify-center text-white shadow-sm">
+              <Bot size={20} />
             </div>
-            <h1 className="font-bold text-lg tracking-tight">AgentWriter</h1>
+            <div>
+              <h1 className="font-bold text-gray-900 leading-tight">Gemini Agent</h1>
+              <p className="text-[10px] text-gray-500 font-medium uppercase tracking-wider">Workflow Automation</p>
+            </div>
           </div>
+          
           <div className="flex items-center gap-4">
-             {appState === AppState.FINISHED && (
-                <span className="text-green-600 text-sm font-medium flex items-center gap-1">
-                   All Tasks Completed
-                </span>
+             {appState !== AppState.IDLE && (
+               <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-full text-xs font-medium text-gray-600">
+                  {appState === AppState.PLANNING && <span className="animate-pulse">Planning...</span>}
+                  {appState === AppState.EXECUTING && <span className="flex items-center gap-1"><span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"/> Executing</span>}
+                  {appState === AppState.FINISHED && <span className="text-green-600">Finished</span>}
+               </div>
              )}
           </div>
         </div>
       </header>
 
-      <main className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <main className="max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
-        {/* Left Column: Plan & Status */}
-        <aside className="lg:col-span-4 xl:col-span-3 flex flex-col gap-4 h-[calc(100vh-7rem)] sticky top-24">
+        {/* Left Sidebar: Controls & Plan */}
+        <aside className="lg:col-span-4 xl:col-span-3 flex flex-col gap-6 sticky top-24 max-h-[calc(100vh-8rem)]">
             
             {/* Input Card */}
-            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                  Topic / Request
-                </label>
+            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm transition-shadow hover:shadow-md">
+                <div className="flex items-center gap-2 mb-3">
+                  <Command size={16} className="text-gray-400" />
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                    Project Goal
+                  </label>
+                </div>
+                
                 <textarea 
-                  className="w-full text-sm p-3 bg-gray-50 rounded-lg border border-gray-200 focus:border-black focus:ring-0 outline-none resize-none transition-colors"
-                  rows={3}
-                  placeholder="e.g., A comprehensive guide to starting a coffee shop..."
+                  className="w-full text-sm p-3 bg-gray-50 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none resize-none transition-all placeholder:text-gray-400"
+                  rows={4}
+                  placeholder="Describe what you want to research or write..."
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   disabled={appState === AppState.EXECUTING || appState === AppState.PLANNING}
                 />
                 
-                <div className="mt-3 flex gap-2">
+                <div className="mt-4">
                    {appState === AppState.IDLE || appState === AppState.FINISHED ? (
                      <button 
                        onClick={handleStart}
                        disabled={!prompt.trim()}
-                       className="flex-1 bg-black text-white text-sm font-medium py-2.5 px-4 rounded-lg hover:bg-gray-800 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                       className="w-full bg-black hover:bg-gray-800 text-white text-sm font-semibold py-3 px-4 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow active:scale-[0.98]"
                      >
-                       <Send size={16} />
-                       Start Agent
+                       <Sparkles size={16} />
+                       Start Workflow
                      </button>
                    ) : (
                      <button 
                        onClick={handleStop}
-                       className="flex-1 bg-red-50 text-red-600 border border-red-100 text-sm font-medium py-2.5 px-4 rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
+                       className="w-full bg-white border-2 border-red-100 hover:border-red-200 hover:bg-red-50 text-red-600 text-sm font-semibold py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2"
                      >
                        <StopCircle size={16} />
-                       Stop
+                       Stop Agent
                      </button>
                    )}
                 </div>
             </div>
 
-            {/* Plan List */}
-            {tasks.length > 0 && (
-                <div className="flex-1 min-h-0">
-                    <PlanList tasks={tasks} currentTaskId={currentTaskId} />
-                </div>
-            )}
+            {/* Plan List Container */}
+            <div className="flex-1 min-h-[400px]">
+                <PlanList tasks={tasks} currentTaskId={currentTaskId} />
+            </div>
             
-            {/* Error Display */}
+            {/* Error Toast */}
             {error && (
-              <div className="bg-red-50 text-red-600 text-xs p-3 rounded-lg border border-red-100">
-                {error}
+              <div className="bg-red-50 text-red-700 text-sm p-4 rounded-xl border border-red-100 animate-in fade-in slide-in-from-bottom-2">
+                <strong>Error:</strong> {error}
               </div>
             )}
         </aside>
 
-        {/* Right Column: Content Output */}
-        <section className="lg:col-span-8 xl:col-span-9 h-full">
+        {/* Right Main Content */}
+        <section className="lg:col-span-8 xl:col-span-9 min-h-[500px]">
            <ContentFeed tasks={tasks} isThinking={appState === AppState.PLANNING} />
-           
-           {/* Bottom Floating Action Bar (Mobile only or specific controls) */}
-           {appState === AppState.EXECUTING && (
-              <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black/90 backdrop-blur text-white px-6 py-3 rounded-full shadow-xl z-50 flex items-center gap-3 lg:hidden">
-                 <RefreshCw className="animate-spin" size={18} />
-                 <span className="text-sm font-medium">Agent is working...</span>
-              </div>
-           )}
         </section>
 
       </main>
