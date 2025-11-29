@@ -1,11 +1,34 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { AgentTask, PlanResponse } from "./types";
 
+// ------------------------------------------------------------------
+// ⚠️ SECURITY NOTE:
+// Hardcoding keys exposes them to anyone who views your site's source code.
+// Only do this for private/test deployments.
+// ------------------------------------------------------------------
+const HARDCODED_API_KEY = "AIzaSyDUHNIyOye12eFHqV1UXB_3sOvL4UQ4g24"; // <--- PASTE YOUR GEMINI API KEY HERE
+
 const createClient = () => {
-  const apiKey = process.env.API_KEY;
+  let apiKey = HARDCODED_API_KEY;
+
+  // Fallback: Try to retrieve from environment variables if a build system is used
   if (!apiKey) {
-    throw new Error("API_KEY is not set in environment variables");
+    try {
+      // Check if process is defined (to avoid ReferenceError in browser)
+      // @ts-ignore
+      if (typeof process !== "undefined" && process.env) {
+        // @ts-ignore
+        apiKey = process.env.API_KEY;
+      }
+    } catch (e) {
+      // process is not defined, ignore error
+    }
   }
+
+  if (!apiKey) {
+    throw new Error("API_KEY is not set. Please paste your key into the HARDCODED_API_KEY variable in geminiService.ts");
+  }
+
   return new GoogleGenAI({ apiKey });
 };
 
