@@ -1,0 +1,5 @@
+{
+  "name": "Gemini Article Agent",
+  "description": "An AI agent that breaks down article generation into research, outlining, and writing steps, visualizing the process in real-time.",
+  "requestFramePermissions": []
+}
